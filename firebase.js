@@ -39,14 +39,4 @@ if (__DEV__) {
 
 fireFunc.region = 'europe-west1';
 
-onAuthStateChanged(fireAuth, user => {
-    if (user != null) {
-      console.log('We are authenticated now!');
-    }else{
-      console.log('We are not authenticated now!');
-    }
-  
-    // Do other things
-  });
-
 export { fireApp, fireAuth, fireDB, fireFunc };
