@@ -7,10 +7,6 @@ import {getAuth,connectAuthEmulator,onAuthStateChanged} from "firebase/auth";
 import Constants from "expo-constants";
 import * as FirebaseCore from "expo-firebase-core";
 
-console.ignoredYellowBox = [
-  "Setting a timer",
-  'AsyncStorage'
-];
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -34,7 +30,9 @@ if (__DEV__) {
 
   //firebase.auth().useEmulator(`http://${origin}:9099/`);
   //firebase.firestore().useEmulator(origin, 8080);
-  //connectFunctionsEmulator(fireFunc,origin,5000);
+  connectFunctionsEmulator(fireFunc,origin,5000);
+}else{
+  console.log = () => null;
 }
 
 fireFunc.region = 'europe-west1';

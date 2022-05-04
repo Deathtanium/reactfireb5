@@ -1,23 +1,65 @@
-import { StyleSheet, Text, View,Image,Alert } from 'react-native'
+import { StyleSheet, Text, View,Image,Alert,BackHandler } from 'react-native'
 import React,{useState,useEffect} from 'react'
 import { KeyboardAvoidingView, TextInput, TouchableHighlight,TouchableOpacity } from 'react-native'
 import { useValidation,customValidationMessages } from 'react-native-form-validator';
 import ImageBackground from 'react-native/Libraries/Image/ImageBackground';
 import HidewithKeyboard from 'react-native-hide-with-keyboard';
 
-import {fireAuth} from '../firebase';
-import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword } from 'firebase/auth';
+import {fireAuth,fireFunc} from '../firebase';
+import { createUserWithEmailAndPassword, onAuthStateChanged, sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
+import { httpsCallable } from 'firebase/functions';
+
+
+import { setGlobalState } from '../global';
+
+const getProfileData = httpsCallable(fireFunc,'getProfileData');
 
 const AuthHandler = ({navigation}) => {
-  
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(fireAuth,user => {
-            if(user){
-                navigation.navigate('HomeScreen');
+        const back = BackHandler.addEventListener('hardwareBackPress', ()=>{handleBackButton();});
+        onAuthStateChanged(fireAuth,user => {
+            if(!!user){
+                getProfileData().then(response=>{
+                    if(response.data['result']==null){
+                        //profile doesn't exist
+                        navigation.navigate('ProfileSetup');
+                    }
+                    else{
+                        //profile exists; shove it in global state
+                        setGlobalState('userData',{
+                            username: response.data['result']['username'],
+                            firstName: response.data['result']['firstName'],
+                            lastName: response.data['result']['lastName'],
+                            phone: response.data['result']['phone']
+                        });
+                        setGlobalState('needUpdate',false);
+                        navigation.navigate('HomeScreen');
+                    }
+                }).catch(error=>{
+                    console.log('getprofiledata error');
+                    console.log(error)
+                });
             }
         });
-        return unsubscribe;
+        return () => {
+            back.remove();
+        };
     });
+
+    const handleBackButton = () => {
+        Alert.alert('Exit','Are you sure you want to exit?',[
+            {text: 'No', onPress: () => {}, style: 'cancel'},
+            {text: 'Yes', onPress: () => BackHandler.exitApp()},
+        ]);
+        return true;
+    }
+    
+    useEffect(()=>{
+        BackHandler.addEventListener('hardwareBackPress', handleBackButton);
+        return () => {
+            BackHandler.removeEventListener('hardwareBackPress', handleBackButton);
+        };
+    },[]);
         
 
     const [email, setEmail] = useState('');
@@ -48,7 +90,8 @@ const AuthHandler = ({navigation}) => {
 
     const handleSignUp = () => {
         if(validateInput()){
-            createUserWithEmailAndPassword(fireAuth,email,password).then(()=>{
+            createUserWithEmailAndPassword(fireAuth,email,password).then((creds)=>{
+                
                 console.log('success');
             }).catch(error=>{
                 console.log(error);
@@ -111,7 +154,16 @@ const AuthHandler = ({navigation}) => {
 
                 </View>
             </KeyboardAvoidingView>
-            <TouchableOpacity>
+            <TouchableOpacity
+            onPress={()=>{
+                if(validate({email: { required: true, email: true }})) {
+                    sendPasswordResetEmail(fireAuth,email)
+                    .then(()=>{
+                        Alert.alert("Email sent", "Check your email for a password reset link");
+                    });
+                }
+            }}
+            >
                 <Text
                 style={styles.hyperlink}
                 >Forgot password?</Text>

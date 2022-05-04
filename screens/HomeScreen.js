@@ -1,55 +1,76 @@
-import { StyleSheet, Text, View,TextInput,TouchableHighlight,Alert } from 'react-native'
+import { StyleSheet, Text, View,TextInput,TouchableHighlight,Alert,BackHandler } from 'react-native'
 import React from 'react'
 import ImageBackground from 'react-native/Libraries/Image/ImageBackground'
-import { fireAuth } from '../firebase';
-import { signOut } from 'firebase/auth';
+import { fireAuth,fireFunc } from '../firebase';
+import { signOut, updatePassword } from 'firebase/auth';
+import ValidationComponent from 'react-native-form-validator';
+import HideWithKeyboard from 'react-native-hide-with-keyboard';
+import { useEffect, useState } from 'react/cjs/react.development';
+import { httpsCallable } from 'firebase/functions';
+import {getGlobalState,setGlobalState} from '../global';
+
+const deleteAccount = httpsCallable(fireFunc, 'deleteAccount');
 
 const HomeScreen = ({navigation}) => {
+  const handleBackButton = () => {
+    Alert.alert('Exit','Are you sure you want to exit?',[
+      {text: 'No', onPress: () => {}, style: 'cancel'},
+      {text: 'Yes', onPress: () => BackHandler.exitApp()},
+    ]);
+    return true;
+  }
+
+  useEffect(()=>{
+    const back = BackHandler.addEventListener('hardwareBackPress', handleBackButton);
+    return () => {
+      back.remove();  
+    };
+  },[]);
+
+  const [password, setPassword] = useState('');
+
+  const handleSignOut = () => {
+    signOut(fireAuth).then(()=>{
+      navigation.navigate('AuthHandler');
+      setGlobalState('userData',{
+        username: '',
+        firstName: '',
+        lastName: '',
+        phone: ''
+      });
+      setGlobalState('needUpdate',true);
+    })
+  }
+
+  const handleChangePassword = ()=>{
+    updatePassword(fireAuth.currentUser,password).then(()=>{
+      Alert.alert('Password Updated','Please login with your new password');
+      signOut(fireAuth).then(()=>{
+        navigation.navigate('AuthHandler');
+      });
+    });
+  }
+  
   return (
     <ImageBackground source={require('../images/streets.png')} style={styles.backgroundImage}>
       <View style={styles.container}>
-        <Text
-        style={styles.fieldLabel}
-        >Username</Text>
-        <TextInput
-        style={styles.input}
-        placeholder={fireAuth.currentUser.displayName?fireAuth.currentUser.displayName:'Enter a username'}
-        placeholderTextColor='#aaaaaa'
-        />
-
-        <Text
-        style={styles.fieldLabel}
-        >Email</Text>
-        <TextInput
-        style={styles.input}
-        placeholder={fireAuth.currentUser.email}
-        placeholderTextColor='#aaaaaa'
-        />
-
+          <Text 
+          style={styles.buttonText}>
+          Welcome, {getGlobalState('userData').firstName.concat(" ",getGlobalState('userData').lastName,"!")}</Text>
         <Text
         style={styles.fieldLabel}
         >Change password</Text>
+
         <TextInput
         style={styles.input}
         secureTextEntry
-        placeholder={'Old password'}
-        placeholderTextColor={'#aaaaaa'}
-        />
-        <TextInput
-        style={styles.input}
-        secureTextEntry
+        onChangeText={setPassword}
         placeholder={'New password'}
-        placeholderTextColor={'#aaaaaa'}
-        />
-        <TextInput
-        style={styles.input}
-        secureTextEntry
-        placeholder={'Confirm new password'}
         placeholderTextColor={'#aaaaaa'}
         />
 
         <TouchableHighlight
-        onPress={()=>{}}
+        onPress={handleChangePassword}
         style={styles.button}
         underlayColor={'#22e6ab'}
         >
@@ -59,7 +80,18 @@ const HomeScreen = ({navigation}) => {
         </TouchableHighlight>
 
         <TouchableHighlight
-        onPress={()=>{signOut(fireAuth).then(navigation.navigate('AuthHandler'))}}
+        onPress={()=>{navigation.navigate('ProfileSetup')}}
+        style={styles.button}
+        underlayColor={'#22e6ab'}
+        >
+            <Text
+            style={styles.buttonText}
+            >Edit Profile</Text>
+        </TouchableHighlight>
+
+
+        <TouchableHighlight
+        onPress={handleSignOut}
         style={styles.button}
         underlayColor={'#22e6ab'}
         >
@@ -76,12 +108,12 @@ const HomeScreen = ({navigation}) => {
             [
               {text: 'Cancel', onPress: () => console.log('Cancel Pressed'), style: 'cancel'},
               {text: 'OK', onPress: () => {
-                fireAuth.currentUser.delete().then(()=>{
+                deleteAccount().then(()=>{
                   fireAuth.signOut().then(()=>{
                     navigation.navigate('AuthHandler')
                   });
                 });
-                }},
+              }},
             ],
             { cancelable: false }
           )
